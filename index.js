@@ -3,35 +3,35 @@ const axios = require('axios');
 const cheerio = require('cheerio');
 
 const manifest = {
-    id: 'org.vipbox.football',
-    version: '1.0.1',
-    name: 'VIPBox Football Clean',
-    description: 'Football streams with multiple links per match from VIPBox',
+    id: 'org.soccerlive.football',
+    version: '1.0.2',
+    name: 'SoccerLive Football Addon',
+    description: 'Multiple football streams per match from SoccerLive.app',
     types: ['tv'],
-    catalogs: [{ type: 'tv', id: 'vipbox-football' }],
+    catalogs: [{ type: 'tv', id: 'soccerlive-football' }],
     resources: ['catalog', 'stream'],
-    idPrefixes: ['vipbox'],
-    logo: 'https://www.vipbox.lc/favicon.ico'
+    idPrefixes: ['soccerlive'],
+    logo: 'https://soccerlive.app/favicon.ico'
 };
 
 const builder = new addonBuilder(manifest);
 
-// Scrape today's football matches
+// Scrape today's football matches from soccerlive.app
 async function fetchMatches() {
-    const res = await axios.get('https://www.vipbox.lc/');
+    const res = await axios.get('https://soccerlive.app/');
     const $ = cheerio.load(res.data);
 
     const matches = [];
 
-    $('a').each((i, el) => {
-        const text = $(el).text().trim();
-        const href = $(el).attr('href');
+    $('.match-item').each((i, el) => {
+        const title = $(el).find('.match-title').text().trim();
+        const href = $(el).find('a').attr('href');
 
-        if (href && text && text.toLowerCase().includes('football')) {
+        if (title && href) {
             matches.push({
-                id: 'vipbox_' + Buffer.from(href).toString('base64'),
-                name: text,
-                poster: 'https://i.imgur.com/2W9Xq4R.png',
+                id: 'soccerlive_' + Buffer.from(href).toString('base64'),
+                name: title,
+                poster: 'https://i.imgur.com/2W9Xq4R.png', // Placeholder poster for matches
                 type: 'tv'
             });
         }
@@ -42,7 +42,7 @@ async function fetchMatches() {
 
 // CATALOG HANDLER
 builder.defineCatalogHandler(async ({ type, id }) => {
-    if (id !== 'vipbox-football') return { metas: [] };
+    if (id !== 'soccerlive-football') return { metas: [] };
 
     const matches = await fetchMatches();
     return { metas: matches };
@@ -50,23 +50,24 @@ builder.defineCatalogHandler(async ({ type, id }) => {
 
 // STREAM HANDLER
 builder.defineStreamHandler(async ({ type, id }) => {
-    if (!id.startsWith('vipbox_')) return { streams: [] };
+    if (!id.startsWith('soccerlive_')) return { streams: [] };
 
-    const decodedHref = Buffer.from(id.replace('vipbox_', ''), 'base64').toString();
-    const url = 'https://www.vipbox.lc' + decodedHref;
+    const decodedHref = Buffer.from(id.replace('soccerlive_', ''), 'base64').toString();
+    const url = 'https://soccerlive.app' + decodedHref;
 
     const res = await axios.get(url);
     const $ = cheerio.load(res.data);
 
     const streams = [];
 
-    $('iframe').each((i, el) => {
-        const src = $(el).attr('src');
+    $('.stream-links a').each((i, el) => {
+        const streamName = $(el).text().trim();
+        const streamUrl = $(el).attr('href');
 
-        if (src && src.startsWith('http')) {
+        if (streamUrl && streamName) {
             streams.push({
-                title: `Stream ${i + 1}`,
-                url: src
+                title: `Stream from ${streamName}`,
+                url: streamUrl
             });
         }
     });
