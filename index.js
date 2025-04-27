@@ -3,33 +3,34 @@ const axios = require('axios');
 const cheerio = require('cheerio');
 
 const manifest = {
-    id: 'org.totalsportek.football',
+    id: 'org.daddylive.football',
     version: '1.0.0',
-    name: 'TotalSportek Football Addon',
-    description: 'Football streams with multiple links per match from TotalSportek',
+    name: 'DaddyLive Football Addon',
+    description: 'Live Football Streams directly playable from DaddyLive.mp',
     types: ['tv'],
-    catalogs: [{ type: 'tv', id: 'totalsportek-football' }],
+    catalogs: [{ type: 'tv', id: 'daddylive-football' }],
     resources: ['catalog', 'stream'],
-    idPrefixes: ['totalsportek'],
-    logo: 'https://totalsportek.to/images/logo.png'
+    idPrefixes: ['daddylive'],
+    logo: 'https://daddylive.mp/images/logo.png'
 };
 
 const builder = new addonBuilder(manifest);
 
+// Scrape homepage matches
 async function fetchMatches() {
-    const res = await axios.get('https://totalsportek.to/');
+    const res = await axios.get('https://daddylive.mp/');
     const $ = cheerio.load(res.data);
 
     const matches = [];
 
-    $('div.match-info').each((i, el) => {
-        const matchTitle = $(el).find('.event-title').text().trim();
-        const matchHref = $(el).find('a').attr('href');
+    $('ul.list-group li a').each((i, el) => {
+        const title = $(el).text().trim();
+        const href = $(el).attr('href');
 
-        if (matchTitle && matchHref) {
+        if (title && href && href.includes('/stream/')) {
             matches.push({
-                id: 'totalsportek_' + Buffer.from(matchHref).toString('base64'),
-                name: matchTitle,
+                id: 'daddylive_' + Buffer.from(href).toString('base64'),
+                name: title,
                 poster: 'https://i.imgur.com/2W9Xq4R.png',
                 type: 'tv'
             });
@@ -39,37 +40,45 @@ async function fetchMatches() {
     return matches;
 }
 
+// Catalog handler
 builder.defineCatalogHandler(async ({ type, id }) => {
-    if (id !== 'totalsportek-football') return { metas: [] };
+    if (id !== 'daddylive-football') return { metas: [] };
 
     const matches = await fetchMatches();
     return { metas: matches };
 });
 
+// Stream handler
 builder.defineStreamHandler(async ({ type, id }) => {
-    if (!id.startsWith('totalsportek_')) return { streams: [] };
+    if (!id.startsWith('daddylive_')) return { streams: [] };
 
-    const decodedHref = Buffer.from(id.replace('totalsportek_', ''), 'base64').toString();
-    const url = 'https://totalsportek.to' + decodedHref;
+    const decodedHref = Buffer.from(id.replace('daddylive_', ''), 'base64').toString();
+    const url = 'https://daddylive.mp' + decodedHref;
 
     const res = await axios.get(url);
     const $ = cheerio.load(res.data);
 
-    const streams = [];
+    const iframeSrc = $('iframe').attr('src');
 
-    $('div.livestream a').each((i, el) => {
-        const streamTitle = $(el).text().trim() || `Stream ${i + 1}`;
-        const streamUrl = $(el).attr('href');
+    if (!iframeSrc) {
+        return { streams: [] };
+    }
 
-        if (streamUrl) {
-            streams.push({
-                title: `Stream from ${streamTitle}`,
-                url: streamUrl
-            });
-        }
-    });
+    const iframeRes = await axios.get(iframeSrc.startsWith('http') ? iframeSrc : `https://daddylive.mp${iframeSrc}`);
+    const iframeBody = iframeRes.data;
 
-    return { streams };
+    const m3u8Match = iframeBody.match(/['"]([^'"]+\.m3u8[^'"]*)['"]/);
+
+    if (m3u8Match && m3u8Match[1]) {
+        return {
+            streams: [{
+                title: "Live Stream",
+                url: m3u8Match[1]
+            }]
+        };
+    } else {
+        return { streams: [] };
+    }
 });
 
 module.exports = builder.getInterface();
