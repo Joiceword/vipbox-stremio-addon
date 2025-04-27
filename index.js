@@ -4,7 +4,7 @@ const cheerio = require('cheerio');
 
 const manifest = {
     id: 'org.soccerlive.football',
-    version: '1.0.2',
+    version: '1.0.3',
     name: 'SoccerLive Football Addon',
     description: 'Multiple football streams per match from SoccerLive.app',
     types: ['tv'],
@@ -16,22 +16,22 @@ const manifest = {
 
 const builder = new addonBuilder(manifest);
 
-// Scrape today's football matches from soccerlive.app
+// Scrape matches
 async function fetchMatches() {
     const res = await axios.get('https://soccerlive.app/');
     const $ = cheerio.load(res.data);
 
     const matches = [];
 
-    $('.match-item').each((i, el) => {
-        const title = $(el).find('.match-title').text().trim();
-        const href = $(el).find('a').attr('href');
+    $('ul.match-list li').each((i, el) => {
+        const matchTitle = $(el).find('.event-name').text().trim();
+        const matchHref = $(el).find('a').attr('href');
 
-        if (title && href) {
+        if (matchTitle && matchHref) {
             matches.push({
-                id: 'soccerlive_' + Buffer.from(href).toString('base64'),
-                name: title,
-                poster: 'https://i.imgur.com/2W9Xq4R.png', // Placeholder poster for matches
+                id: 'soccerlive_' + Buffer.from(matchHref).toString('base64'),
+                name: matchTitle,
+                poster: 'https://i.imgur.com/2W9Xq4R.png',
                 type: 'tv'
             });
         }
@@ -40,7 +40,7 @@ async function fetchMatches() {
     return matches;
 }
 
-// CATALOG HANDLER
+// Catalog Handler
 builder.defineCatalogHandler(async ({ type, id }) => {
     if (id !== 'soccerlive-football') return { metas: [] };
 
@@ -48,7 +48,7 @@ builder.defineCatalogHandler(async ({ type, id }) => {
     return { metas: matches };
 });
 
-// STREAM HANDLER
+// Stream Handler
 builder.defineStreamHandler(async ({ type, id }) => {
     if (!id.startsWith('soccerlive_')) return { streams: [] };
 
@@ -60,11 +60,11 @@ builder.defineStreamHandler(async ({ type, id }) => {
 
     const streams = [];
 
-    $('.stream-links a').each((i, el) => {
-        const streamName = $(el).text().trim();
+    $('.streams a').each((i, el) => {
+        const streamName = $(el).text().trim() || `Stream ${i + 1}`;
         const streamUrl = $(el).attr('href');
 
-        if (streamUrl && streamName) {
+        if (streamUrl) {
             streams.push({
                 title: `Stream from ${streamName}`,
                 url: streamUrl
