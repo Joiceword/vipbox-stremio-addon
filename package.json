@@ -1,0 +1,15 @@
+{
+  "name": "stremio-vipbox-addon",
+  "version": "1.0.0",
+  "description": "VIPBox Football Streams for Stremio",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "stremio-addon-sdk": "github:Stremio/stremio-addon-sdk",
+    "express": "^4.17.1",
+    "axios": "^1.7.2",
+    "cheerio": "^1.0.0-rc.12"
+  }
+}
