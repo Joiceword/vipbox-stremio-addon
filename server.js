@@ -5,8 +5,10 @@ const app = express();
 const port = process.env.PORT || 7000;
 
 app.get('/manifest.json', (req, res) => {
-    res.send(addonInterface.manifest);
+    res.setHeader('Content-Type', 'application/json');
+    res.send(JSON.stringify(addonInterface.manifest));
 });
+
 
 app.get('/:resource/:type/:id/:extra?.json', (req, res) => {
     addonInterface.get(req).then(resp => {
